@@ -1,0 +1,38 @@
+# Kafka-Cluster
+
+Besteht aus Brokern, die vom Zookeeper verwaltet werden
+
+
+
+
+Im Cluster gibts normaleweise einen Master,
+der eine Liste von Mitgliedern hat. Er kennt immer
+den Zustand jeden Mitglieds.
+Woher weiss man, welcher Broker ist abgestütrzt?
+Woher weiss man, welcher Broker ist hinzugekommen?
+
+Apache-Kafka ist Masterless.
+Sie benutzt den Zookeeper um die Broker aufzulisten
+mit jeweiligen id's.
+Wenn ein Broker startet, dann verbindet er sich zum
+Zookeeper. Dann hat der Broker eine aktive Session zum Zookeeper.
+Wenn die Verbindung bricht, so löscht der Zookeeper
+diesen Broker von seiner Liste
+
+## 1. Cluster Mitgliedshaft?
+----
+\Kafka_Streams\kafka_2.12-2.5.0>.\bin\windows\zookeeper-shell.bat localhost:9092
+ls /
+ls /brokers
+ls /ids
+----
+## 2. Administrative Tasks im Cluster?
+#### Überwache broker
+#### Weise neuen Überwache zu
+Das macht der Controller. Er ist kein Master im Cluster.
+Das ist ein Broker, wie jeder anderer, der ein paar Aufgaben mehr hat.
+Wie finde ich heraus, wer der Controller ist? (Abfrage mit get)
+----
+\Kafka_Streams\kafka_2.12-2.5.0>.\bin\windows\zookeeper-shell.bat localhost:9092
+get /controller
+----

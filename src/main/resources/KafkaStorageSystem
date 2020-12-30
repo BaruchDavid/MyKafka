@@ -1,0 +1,104 @@
+# Kafka Storage Arhchitektur
+
+----
+--\Kafka_Streams\kafka_2.12-2.5.0>.\bin\windows\kafka-topics.bat
+                    --create
+                    --zookeeper localhost:2181
+                    --replication-factor 3
+                    --partitions 5
+                    --topic word-count-output
+----
+Ordner-Aufbau:
+----
+tmp-|
+  --|broker1
+    --|-my_topic-0
+      |-my_topic-1
+      |-my_topic-2
+      |-my_topic-3
+      |-my_topic-4
+      |-my_topic-5
+  --|broker2
+    --|-my_topic-0
+      |-...
+      |-my_topic-5
+  --|broker3
+    --|-my_topic-0
+      |-...
+      |-my_topic-5
+----
+
+## Topic
+Topic ist wie eine Tabelle in der Daten organisiert sind.
+Oben wurde eine Topic 'word-count-output' erzeugt.
+
+### Logfile und Segmente
+Sowie Tabellen in Datafiles gespeichert werden, so wird die Topic
+im Logfile gespeichert.
+Es ist nicht sinnvoll ein riesiges Logfile zu haben.
+Deswegen splittet kafka das Logfile in Segmente, hat also
+mehrere kleine Logfiles. Standardgröße für Segment ist 1GB
+----
+broker/word-count-output-0/00000000.log
+broker/word-count-output-0/00002343.log
+broker/word-count-output-0/00004234.log
+----
+#### Partition
+----
+--partitions 5
+----
+Topic ist auf *beliebig* viele Partitionen aufgeteilt
+
+Bewirkt, dass jeder Broker 5 Pfade bzw. Ordner für jede Partition erzeugt.
+Benennung dabei ist normalerweise:
+
+* broker/word-count-output-0
+* broker/word-count-output-1
+* broker/word-count-output-3
+* broker/word-count-output-4
+* broker/word-count-output-5
+
+Wenn man 10 Partitionen für ein Topic hat, so kriegt man 10 Unterordner für
+die jeweilige Topic.
+Da ein Topic als Logfile, welches auf Segment-Dateien aufgesplittet ist präsentiert wird
+und gleichzeitig das Topic auf partitionen aufgesplittet ist, so befinden sich jeweilige Segment-Files
+in jeweiligen Ordnern, die als Partition verstanden werden.
+Zwei Sichten: File-System-Sicht und Kafka-Sicht.
+
+File-System-Sicht        | Kafka-Sicht
+alle word-count-output-n | Das ist eine Topic
+z.b word-count-output-0  | Das ist eine Partition
+z.b 000001.log           | Erstes Offset-Segment
+z.b 000020.log           | 2tes Segment mit Start-Offset 20
+z.b 000020.timestamp    |  erstes Segment wo man Daten anhand der Zeit sucht
+
+##### Replicas
+
+----
+--replication-factor 3
+----
+bewirkt, dass jede Partition drei mal vorhanden ist.
+Insgesamt ergeben sich 15 Pfade, 5 Pfade auf jeweils einem Broker.
+Dabei gibt es eine Lead-Partitionen auf dem Lead-Broker
+und zwei Follower-Partitionen auf den Replica-Brokern.
+z.b
+
+* broker/word-count-output-0
+
+###### Offset / Timestamp
+wir haben unsere in Segmente gesplittetes Logfile
+
+----
+00000000.log
+00002343.log
+00004234.log
+----
+Man kann eine Nachricht anhand der Topic +  Partition + Offset herauslesen.
+D.h wenn man sagt: offset 2343, dann wird aus dem zweiten Segment **00002343.log**
+des Logfiles gelesen
+Ebenso kann man anhand eines Zeitstempels suchen, wessen Daten so organisiert sind
+----
+broker/word-count-output-0/00000000.timestamp
+broker/word-count-output-0/00002343.timestamp
+broker/word-count-output-0/00004234.timestamp
+----

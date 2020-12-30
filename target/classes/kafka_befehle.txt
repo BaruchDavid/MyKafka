@@ -1,0 +1,78 @@
+kafka-streams ist gleichzeitig producer und consumer.
+
+Daher erzeugt es den:  creating consumer client mit der group.id == application.id
+Dann wird erzeugt:     restoring consumer clients
+                       Weil Kafka-Streams versucht zu widerherstellen, wo es zu letzt aufgehört hat
+                       Deswegen muss man es mit dem Hook ordnungsgemäß runterfahren
+                       damit der letzte Offset erhalten bleibt
+Das Programm startet: State transition from CREATED to RUNNING
+
+//erzeuge zookeper
+C:\Kafka_Streams\kafka_2.12-2.5.0> .\bin\windows\zookeeper-server-start.bat .\config\zookeeper.properties
+
+//erzeuge kafka-server, der den zookeper kontaktiert
+C:\Kafka_Streams\kafka_2.12-2.5.0> .\bin\windows\kafka-server-start.bat .\config\server.properties
+
+//erzeuge topic aus der die Rohdaten gelesen werden, mit partition=2 um Skalierung zu ermöglichen
+C:\Kafka_Streams\kafka_2.12-2.5.0> .\bin\windows\kafka-topics.bat --create --zookeeper localhost:2181
+                                    --replication-factor 1 --partitions 2 --topic word-count-input
+
+//erzeuge topic in der die manipulierten Daten reingeschrieben werden
+C:\Kafka_Streams\kafka_2.12-2.5.0> .\bin\windows\kafka-topics.bat --create --zookeeper localhost:2181
+                                    --replication-factor 1 --partitions 2 --topic word-count-output
+C:\Kafka_Streams\kafka_2.12-2.5.0> .\bin\windows\kafka-topics.bat --zookeeper localhost:2181 --list
+
+//erzeuge producer
+C:\Kafka_Streams\kafka_2.12-2.5.0> .\bin\windows\kafka-console-producer.bat --broker-list localhost:9092 --topic eingangs-topic-für-rohrdaten
+
+//erzeuge producer mit nem key, der anhand des seperators erkannt wird. In diesem Beispiel ist es ein Komma
+C:\Kafka_Streams\kafka_2.12-2.5.0> .\bin\windows\kafka-console-producer.bat --broker-list localhost:9092 --topic eingangs-topic-für-rohrdaten --property parse.key=true --property key.seperator=,
+
+
+
+//erzeuge consumer, der auf die output-topic mit den manipulierten Daten horscht
+
+//Starte die Topology. achte auf 'current active tasks'
+//Starte nen Consumer, der auf die OUT-PUT-TOPIC der Topology horcht:
+C:\Kafka_Streams\kafka_2.12-2.5.0> .\bin\windows\kafka-console-consumer.bat --bootstrap-server localhost:9092
+                                     --topic word-count-output
+                                     --from-beginning
+                                     --formatter kafka.tools.DefaultMessageFormatter
+                                     --property print.key=true
+                                     --property print.value=true
+                                     --property key.deserializer=org.apache.kafka.common.serialization.StringDeserializer
+                                     --property value.deserializer=org.apache.kafka.common.serialization.LongDeserializer
+
+oder für GIT-BASH
+./bin/windows/kafka-console-consumer.bat --bootstrap-server localhost:9092 \
+                                      --topic favorite-colour-output \
+                                      --from-beginning \
+                                      --formatter kafka.tools.DefaultMessageFormatter \
+                                      --property print.key=true \
+                                      --property print.value=true \
+                                      --property key.deserializer=org.apache.kafka.common.serialization.StringDeserializer \
+                                      --property value.deserializer=org.apache.kafka.common.serialization.LongDeserializer
+
+
+//INTERNE KAFKA-TOPIC: man braucht nen Consumer:
+C:\Kafka_Streams\kafka_2.12-2.5.0> .\bin\windows\kafka-console-consumer.bat --bootstrap-server localhost:9092
+                                     --topic streams-app-KSTREAM-AGGREGATE-STATE-STORE-0000000007-repartition
+                                     --from-beginning
+                                     --formatter kafka.tools.DefaultMessageFormatter
+                                     --property print.key=true
+                                     --property print.value=true
+                                     --property key.deserializer=org.apache.kafka.common.serialization.StringDeserializer
+                                     --property value.deserializer=org.apache.kafka.common.serialization.LongDeserializer
+
+
+SKALIERUNG: Es wurd Topic mit zwei Partition erzeugt, d.h man kann zwei applications-Instanzen gleichzeitig laufen lassen
+            Das geht, weil die Application gleichzeitig der Consumer und Producer ist.
+            Der Consumer wird dabei in die Consumer-Group hinzugefügt anhand der Application-ID
+            die gleichzeitig auch die Consumer-Group-ID ist. Also added sich die zweite Instanz
+            automatisch durch die gleiche ID hinzu und horcht auf die zweite Partition
+
+            Wenn man zuerst eine Instanz startet, gibt es 4 Tasks für eine Instanz.
+            Dann startet eine zweite Instanze, dann kommt es zum REBALANCING
+            und es gibt für zwei Instanzen je zwei Tasks.
+            Wenn eine Instanz stirbt, dann kommt es wieder zum REBALANCING
+            und die übrig gebliebene hat alle 4 Tasks

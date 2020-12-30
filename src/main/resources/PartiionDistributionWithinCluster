@@ -1,0 +1,109 @@
+# Kafka-Cluster
+
+1. Gerade Verteilung von Partitionen
+2. Ausfallsicherheit von Partitionen
+
+## Gegeben
+
+
+10 Partitionen, 3 Replicas auf  6 Broker = 30 Partitionen/Verzeichnisse
+
+### Brokerliste ermitteln
+image::BrokerListe.png[kein Bid gefunden]
+### Partitionen verteilen
+image::Partitionen-Verteilung.png[]
+Man sieht, dass Broker0 zwei Leader-Partitionen hat: P0 und P6 und zwei Replicas
+von Partitionen P5 und P4.
+Weiter ist die Ausfallsicherheit hier gegeben, den P0 kommt bei seinen
+3 Replicas (1Leader+2Follower) auf immer andere Broker.
+
+### Rollen eines Brokers
+Wie man sieht, hat Broker4 Partitionen 3 und 9 als Leader-Partitionen
+und Partitionen 2,8,1 und 7 sind Follower. D.h Broker4 fundiert als
+Leader und als Follower.
+
+### *LEADER*
+Leader ist der Anlauf-Punkt für alle Requests von Producern and Consumern.
+
+1. Producer fragt nach Meta-Informationen irgendeinen Broker
+   Zurück kriegt er eine List von Leader-Partitionen.
+   Dann entscheidet er, wohin er seine Daten schickt.
+   Zurück kriegt er von dem Leader einen ACK
+
+### *FOLLOWER*
+Follower redet nie mit Producer oder Consumer.
+Seine Aufgabe ist:
+
+1. Kopieren vom Leader die Nachrichten bei sich.
+2. Bleiben up-date.
+Das Ziel des Follower ist: => werde LEADER, wenn der aktueller Leader stirbt
+Daher versucht der Follower immer synchron mit dem Leader zu sein,
+also alle Nachrichten vom Leader zu kopieren.
+Denn wenn er nicht synchron mit dem Leader ist, dann kann er Follower nicht
+zum Leader gewählt werden.
+
+3. Follower fragt den Leader nach Nachrichten und speichert sie bei sich.
+
+#### Follower-Probleme synchron mit dem Leader zu sein
+
+1. Netzwerk-Überlastung: Überlastung kann die Replication stark verlangsamen
+   sodass ein Follower zuweit zurückfällt.
+2. Wenn der Follower-Broker crasht, dann muss er von vorne alles erfragen
+
+#### *ISR-Liste*
+1. Da Follower crashen können, muss der Leader eine ISR-Liste haben,
+mit aktuellen online-followern. ISR-Liste ist im Zookeeper gespeichert.
+Diese Liste hat Kandidaten für einen neuen Leader, wenn der alte abschmiert.
+
+2. Woher weisst der Leader, dass der Follower in-sync ist?
+Follower fragt nach Offset 0. Leader hat 10 Nachrichten,
+dann kriegt Follower von 0 bis 10 alle Nachrichten.
+Dann kriegt der Leader 10 neue Nachrichten. Der Follower erfragt
+Nachrichten mit dem Offset 10, der Leader merkt, dass der aktueller
+Offset erfragt wird und geht sicher davon aus ,dass der Follower in-sync ist.
+Follower bleibt in der ISR-Liste, wenn innerhalb von 10 Sekunden nach
+neuen Nachrichten fragt, ansonsten fliegt er ausd er Liste.
+
+3. Wenn alle Follower 11 Sekunden hinter dem Leader sind,
+so ist niemand in der ISR-Liste.
+Jetzt crasht der Leader, wer wird gewählt?
+
+*Commited /Uncommited Messages*
+Man kann dem Leader konfigurieren, dass er Nachrichten
+erst dann als Commited betrachtet, wenn alle Follower ihm
+nen ACK zurückgeschickt haben, dass sie die Nachrichten bei sich repliziert haben.
+Die auf allen Brokern commitete replica-partitionen können wir nicht mehr verlieren,
+es seid den, alle Follower-Broker fallen gleichzeit aus, was unwahrscheinlich ist.
+Dann hat der Leader manche commited und uncommited.
+Nun, wenn der Leader abschmiert, so fehlen uns uncommitede Nachrichten.
+Aber das ist nicht schlimm, da sie vom Producer noch mal geschickt werden können.
+Warum schickt der Producer noch mal Nachrichten an den Leader?
+Weil er auf ACK vom Leader wartet für jede Nachricht,
+ansonsten betrachtet der Producer sie nicht als commited (beim Leader)
+und schickt von selbst nach nem TimeOut erneut alles an den Leader,
+da ihm die ACK's vom Leader fehlen.
+Das erneute Verschicken geht dann wahrscheinlich an den neu gewählten Leader,
+der vorhin ein Follower war und bei sich vorherig (vom vorherigen Leader)
+commiteten Nachtichten hält.
+
+*Minimum In-Sync Replicas*
+
+Wenn nun zwei Follower ausfallen, so bleibt nur der Leader selbst in der ISR-Liste,
+obwohl wir unser Topic mit 3 Replicas konfiguriert haben.
+Wenn wir den Leader nun verlieren, dann verlieren wir die Daten.
+Hier konfiguriert mann, dass mind. Anzahl der Broker in der ISR-Liste ist zwei.
+
+*ReadOnly*
+
+Wenn man diese Einstellung setzt, dann erfordert man, dass
+zum Schreiben in die Topic mind. 2 von 3 Replicas in der Liste sein müssen.
+Ansonsten gibt Kafka nen Fehler *NOT ENOUGH REPLICAS EXCEPTION*
+und ist *ReadOnly*
+
+
+
+
+
+
+
+
