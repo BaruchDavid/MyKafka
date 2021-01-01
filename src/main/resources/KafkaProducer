@@ -22,6 +22,9 @@ Daneben gibt es 3 Optional-Arguments: Key, Timestamp, Partition
 ### Sendeablauf:
 Producer schickt Daten an den Broker. Das passiert aber nicht direkt, sondern:
 
+image::ProducerSendActivity.png[]
+
+
 1. Serializer:
 Notwendig um Daten über das Netzwerk zu schicken. Kafka, weiss nicht
 wie man Daten serialisieren soll, daher benutzt Man KEY_SERIALIZER_CLASS_CONFIG und
@@ -78,6 +81,34 @@ Warum braucht den Bufferer?
 
 Es gibt uns zwei Vorteile:
 
+1. Der Sende-Ablauf blockiert nicht. Daten werden in den Buffer geschoben
+und es geht weiter. Der I/O-Thread schickt dann weiter
+
+2. Man kann alle Nachrichten direkt abschicken und nicht jede einzelne.
+
+Problem: Wenn die Nachrichten schneller reinkommen, als sie vom Buffer weiter verschickt
+werden, dann blockiert es.
+Man kann den Buffer-Speicherplatz erhöhen mit der Einstellung:
+Buffer.memory
+Standart ist 32MB.
+
+### Vollständiger Ablauf:
+1. Serialisieren
+
+2. Partitionieren, entweder mit eigener Klasse oder mit dem Hash
+
+3. Ins Buffer stecken, Buffer-Speicherplatz evtl. anpassen
+
+4. I/O Thread holt sich aus dem vollgelaufenem Buffer die Werte
+und schickt an den Broker
+
+5. Wenn Broker es bei sich in die Partition schreiben kann,
+kriegt I/O Thread nen ACK.
 
 
+6. Wenn I/O keinen ACK kriegt, dann versucht er es noch drei mal, wenn es dann
+immer noch nicht klappt oder einen Fehler kriegt,
+kriegt die Send-Methode einen Fehler.
+
+image::ProducerSendActivityFULL.png[]
 

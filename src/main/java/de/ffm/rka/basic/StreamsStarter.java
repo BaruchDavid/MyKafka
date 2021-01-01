@@ -1,6 +1,8 @@
 package de.ffm.rka.basic;
 
 import org.apache.kafka.clients.consumer.ConsumerConfig;
+import org.apache.kafka.clients.producer.ProducerConfig;
+import org.apache.kafka.common.config.TopicConfig;
 import org.apache.kafka.common.serialization.Serdes;
 import org.apache.kafka.streams.KafkaStreams;
 import org.apache.kafka.streams.StreamsBuilder;
@@ -17,6 +19,7 @@ public class StreamsStarter {
     public static void main(String[] args) {
 
         Properties properties = new Properties();
+        ProducerConfig.BUFFER_MEMORY_CONFIG
         properties.put(StreamsConfig.APPLICATION_ID_CONFIG, "streams-app");
         properties.put(StreamsConfig.BOOTSTRAP_SERVERS_CONFIG, "localhost:9092");
         properties.put(StreamsConfig.DEFAULT_KEY_SERDE_CLASS_CONFIG, Serdes.String().getClass().getName());
