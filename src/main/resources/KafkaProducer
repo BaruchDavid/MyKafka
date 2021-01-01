@@ -1,0 +1,83 @@
+# Kafka-Producer
+
+----
+KafkaProducer<Integer, String> producer = new KafkaProducer<>(props);
+----
+Dieser Producer wird erzeugt mit dem Schlüssel Integer und der Nachricht als String.
+Daher sind in der Konfiguration festgelegt:
+
+----
+props.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, IntegerSerializer.class.getName());
+props.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, StringSerializer.class.getName());
+----
+
+## 1. Producer-Record
+Producer schickt seine Nachrichten mit der send-Methode.
+----
+producer.send(new ProducerRecord<>(AppConfigs.topicName, i, "Simple Message-" + i));
+----
+Dabei gibt es 2 Mandatory-Argumente:Topic-Name und Value.
+Daneben gibt es 3 Optional-Arguments: Key, Timestamp, Partition
+
+### Sendeablauf:
+Producer schickt Daten an den Broker. Das passiert aber nicht direkt, sondern:
+
+1. Serializer:
+Notwendig um Daten über das Netzwerk zu schicken. Kafka, weiss nicht
+wie man Daten serialisieren soll, daher benutzt Man KEY_SERIALIZER_CLASS_CONFIG und
+VALUE_SERIALIZER_CLASS_CONFIG. Meistens werden komplexe Java-Objekte serialisiert
+
+2. Partitioner:
+Er entscheidet in welche Partition der Topic die Nachricht abgelegt wird.
+Man kann die Partition im Optionalen Parameter übergeben oder so setzen:
+----
+props.put(ProducerConfig.PARTITIONER_CLASS_CONFIG, MyPartitioner.class.getName());
+----
+
+2a. *DEFAULT*-Partitioner:
+Meist wird der Default-Partitioner von Kafka verwendet. Der Default-Partitioner
+arbeitet anhand: *HASH-KEY-PARTITIONIERUNG* oder *ROUND-ROBIN-PARTITIONIERUNG*
+
+#### HASH-KEY-PARTITIONIERUNG
+Er mach anhand immer des selben Schlüssels einen Hash-Wert.
+Dieser Hash-Wert ist die ID für die Partition:
+hash(key)=partitionNumber
+Der Hash-Algoritmus nimmt auch die Gesamtanzahl von Partitionen.
+Wenn man nun die Partitionen-Anzahl ändert, so ändert sich logischerweise
+der Hash-Wert und dann wiederrum werden die Nachrichten mit demselben Schlüssel
+in eine andere Partition reingeschrieben. Es muss alles dann neu reorganisiert werden.
+D.h. wenn man HASH-KEY-PARTITIONIERUNG verwendet, dann darf man die Partitionen-Anzahl
+nicht ändern, man sollte lieber vorrausschauend mehr Partitionen festlegen, als man bräuchte.
+
+#### ROUND-ROBIN-PARTITIONIERUNG
+Wenn der Key null ist, dann wird dieser Ansatz als Default-Partitionierung gewählt.
+Für jeder Nachricht wird abwechselnd die eine oder die andere Partition gewählt.
+
+### TIMESTAMP ARGUMENT.
+Timestamp wird immer bei einer Nachricht gesetzt, selbst wenn man das explizit nicht angibt.
+Es gibt zwei Mechanismen, für die jeweilige Erzeugung der Zeit:
+
+*CREATE-TIME* ist die Zeit wo die Nachricht erzeugt wurde.
+
+*LOG-APPEND-TIME* ist die Zeit, als der Broker die Nachricht erhalten hat
+
+Man kann nicht beides nutzen.
+Einstellung: message.timestamp.type=0 //created time, das ist der Default wert
+
+Einstellung: message.timestamp.type=1 //LOG-APPEND time
+
+3. Buffering:
+
+-- Buffer für Partition 0 Topic-A
+
+-- Buffer für Partition 1 Topic-A
+
+Nun sitzt die Nachricht im Buffer und wartet drauf, verschickt zu werden.
+Dann wird es über I/O-Thread, der einen Request erzeugt, an den Cluster verschickt.
+Warum braucht den Bufferer?
+
+Es gibt uns zwei Vorteile:
+
+
+
+
