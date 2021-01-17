@@ -1,0 +1,96 @@
+# Kafka-Consumer Groups
+
+Eins der Ziele ist, eine Real-Time Anwendung zu bauen.
+Wenn mehr Nachrichten reingeschickt werden, als sie Consumer verarbeiten kann,
+dann fällt der Consumer immer mehr und mehr zurück und es ist keine Real-Time Anwendung mehr.
+Anders gesagt: Wenn die Rate der Schreibvorgänge in die Topic die Rate der Lesevorgänge überschreitet
+dann ist es keine RealTime-Anwendung mehr.
+
+image::../../pictures/NoRealTime.png[]
+
+# Mehrere Consumer
+
+Um Abhilfe zu schaffen, setzt man mehrere Consumer ein.
+Dabei ist es praktisch, dass eine Topic mehrere Partitions hat.
+Man weisst jeder Partition einen bestimmten Consumer zu.
+Dieser Consumer wird nie Daten von einer anderen Partition erhalten
+und es wird kein doppeltes Empfangen der Daten geben.
+
+image::../../pictures/MultipleConsumer.png[]
+
+Problem dabei ist, ist die Skalierung. Wenn man 10 Partitionen hat,
+dann kann man maximum 10 Consumer hinzufügen. Hier muss man vorausschauend
+die Anzahl der Partitions planen.
+
+# Consumer Group
+
+Das regelt die Skalierung und Ausfallsicherheit.
+Jeder Consumer kriegt eine ConsumerId. Kafka wird immer dann eine Partition zuweisen.
+Wenn aus 10 Consumern, die schon zur 10 Partitionen zugewiesen wurden, der 10te
+Consumer ausfällt, dann wird z.b der neuente Consumer die Daten aus seiner
+neuenten Partition erhalten und zusätzlilch ist es auch jetzt für die 10te Partition
+zuständig. Das ist das Rebalancing.
+
+image::../../pictures/ConsumerGroupOnConsumerFailed.png[]
+Wenn der neuer Consumer verfügbar ist, dann wird die 10te Partition zur ihm verschoben.
+So wird die Skalierung umgesetzt.
+
+# Problem mit Consumer Group
+
+Beim Rebalancing der 10ten Partition von dem 10ten Consumer auf den 9ten Consumer,
+soll der 9te Consumer nicht noch mal die Daten verarbeiten, die schon der 10te verarbeitet hat.
+
+# Offset Managment
+
+Kafka hat für eine Partition zwei offsets:
+Diese zwei offsets sind für den Consumer dar.
+
+## current Offset:
+
+                wird beim nächsten polling des Consumers verwendet
+                Am Anfang ist der current-Offset ist null für den neuen Consumer.
+                In diesem Fall kann man beim Subscribe konfigurieren:
+                auto-offset-reset=earliest/latest. Default ist 'latest'. Beim 'earliest'
+                kriegt man den ersten offset von der Partition. Beim 'latest' schickt der
+                Broker nur die noch bevorstehenden Daten, nach dem der Consumer subscribed hat.
+                All dies passiert, wenn der current-Offset ist null.
+                Nach dem current-offset definiert ist, wird er für den poll() verwendet.
+                Also current-offset existiert nur während der session zwischen Consumer
+                und Broker.
+
+
+## committed Offset:
+
+                Jedes mal, wenn man poll() ausführt, commited der consumer
+                den vorherigen 'current-offset' und consumiert weiter, die dem
+                'current-offset' entsprechen. Das ist der AUTO-COMMIT.
+                Konfiguration: enable-auto-commit=true/false. (default ist true).
+                Setzt man es auf 'false', kann man selbst das Commiten steuern
+                beim 'commitSync' 'commitAsync'
+                Das ist der letzte Offset der sicher beim Broker gespeichert ist.
+                Wenn der 10te Consumer stirbt, wird die 10te Partition dem 9ten
+                Consumer zugewiesen. Committed Offset überschreibt die Position
+                des Current-Offsets in der 10 Partition. Commited Offset vermeidet
+                dupplicate.
+
+Der Current-Offset ist dann 'latest' oder 'earlest' wenn kein Commited-Offset
+definiert ist. Sonst kriegt Current-Offset den Wert vom Commited-Offset.
+
+# Situation:
+
+Consumer pollt eine Nachricht, verarbeitet diese (z.b in die andere Topic oder db schreiben)
+Current-Offset ist dabei 11 und commited-Offset ist null.
+Und bevor consumer noch mal pollt, stirbt er.
+Was passiert dann? Der Commit-Offset ist immer noch null.
+Er wird nur dann geupdated, wenn wir noch mal poll() aufrufen.
+Der broker denkt, dass wir erfolgreich die Daten empfangen haben.
+Diese Nachricht wird dann beim Broker commited um einen Resend zu vermeiden.
+Aber in unserem Fall, haben wir verarbeitet aber gecrasht, bevor wir noch mal pollen konnten
+um den Broker wissen zulassen, dass alles gut gelaufen ist.
+Diese Situation wird Duppletten erzeugen.
+Dann kommen Transactionen ins spiel.
+Das erfodert mehr und mehr Code, der auch Bugs enthalten kann.
+
+
+
+

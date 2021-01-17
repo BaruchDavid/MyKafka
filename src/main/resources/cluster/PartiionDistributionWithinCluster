@@ -9,9 +9,9 @@
 10 Partitionen, 3 Replicas auf  6 Broker = 30 Partitionen/Verzeichnisse
 
 ### Brokerliste ermitteln
-image::BrokerListe.png[kein Bid gefunden]
+image::../pictures/BrokerListe.png[kein Bid gefunden]
 ### Partitionen verteilen
-image::Partitionen-Verteilung.png[]
+image::../pictures/Partitionen-Verteilung.png[]
 Man sieht, dass Broker0 zwei Leader-Partitionen hat: P0 und P6 und zwei Replicas
 von Partitionen P5 und P4.
 Weiter ist die Ausfallsicherheit hier gegeben, den P0 kommt bei seinen

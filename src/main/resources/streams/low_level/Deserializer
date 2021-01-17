@@ -1,0 +1,63 @@
+
+
+## Daten im Consumer Desirialisieren: JsonDeserializer
+Beim Empfang der Daten muss man sie irgendwie aus dem byte-streams
+in einen java-objekt umwandeln. Dafür ist ein Json-Deserializer notwendig
+oder auch AVRO.
+Um seinen eigenen JsonDesirializer zu schreiben, implementiert man
+das Kafka Interface
+
+----
+public class JsonDeserializer<T> implements Deserializer<T>
+----
+
+Bei der Implementierung dieses Interfaces überschreibt man zunächst die
+----
+@Override
+public void configure(Map<String, ?> props, boolean isKey)
+----
+Ziel dabei ist zu sagen, wie die Klasse heisst, von der man die Daten
+später lesen möchte. Der zweite isKey-Parameter hilft zu unterscheiden,
+ob man diesen Desirializer für die Desirializierung von Schlüsseln
+oder  von Values einer Topic verwenden will.
+Mögliche Implementierung:
+
+----
+if (isKey)
+className = (Class<T>) props.get(KEY_CLASS_NAME_CONFIG);
+else
+className = (Class<T>) props.get(VALUE_CLASS_NAME_CONFIG);
+----
+
+Als nächstes überschreibt man die Methode:
+----
+@Override
+public T deserialize(String topic, byte[] data) {
+----
+Dabei nutzt man den Wert der Variable className.
+Für das Deserialisieren von Objekten verwendet man den ObjectMapper von JACKSON
+----
+private ObjectMapper objectMapper = new ObjectMapper();
+// und
+return objectMapper.readValue(data, className);
+----
+Dann sieht die mögliche Implementierung der überschriebenen
+Deserializer Methode so aus:
+----
+@Override
+public T deserialize(String topic, byte[] data) {
+    if (data == null) {
+        return null;
+    }
+    try {
+        return objectMapper.readValue(data, className);
+    } catch (Exception e) {
+        throw new SerializationException(e);
+    }
+}
+----
+
+
+
+
+

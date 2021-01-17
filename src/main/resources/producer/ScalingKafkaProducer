@@ -1,0 +1,40 @@
+# Skalierung von Producern
+
+
+1.
+Man kann mehr Producer-Computer hinzufügen und man kann mehr Computer
+in den Cluster hinzufügen.
+
+2. Man kann einen Producer Multi-Thread machen und so skalieren.
+
+image::../pictures/ScalingKafkaProducerPic.png[]
+
+In dem Main-Thread wir ein einziger KafkaProducer erzeugt.
+Er ist Thread-Save, sodass man ihn an jeden Thread weitergeben kann.
+Das ist besser und ressourcen-schonender als bei jedem Thread nen eigenen
+Producer zu erzeugen.
+
+## Only-ONCE Problem
+
+Wenn beim Senden in den Cluster der I/O Thread keinen ACK kriegt,
+weil bsp. die Netzwerkverbindung unterbrochen ist, dann schickt er die selbe
+Nachricht noch mal. Man kann konfigurieren, dass das mehrmals Versuche die Nachricht
+an den Broker zu schicken nur 1 ist. Dann geht man die Gefahr, dass die Nachricht verloren geht,
+wenn der Leader ausfällt und die Follower nicht in der ISR sind.
+Deswegen konfiguriert man *EXCATLY-ONCE* Eigenschaft:
+
+image::../pictures/OnlyOnce.png
+
+Hierbei wird die Nachricht mit Producer-ID und Sequenz-Number geschickt.
+Nun weiss der Broker, dass die letzt Nachricht X ist.
+So muss die nächste X+1 sein.
+
+Durch *EXCACTLY-ONCE* wird sichergestellt, dass die Nachricht weder
+verloren noch dupliziert wird.
+Diese Einstellung greift nur für die Wiederversuche eine Nachricht zu verschicken.
+Diese Einstellung schützt nicht davor, wenn man den Code so schreibt,
+dass es Duplicate verschickt.
+
+
+
+

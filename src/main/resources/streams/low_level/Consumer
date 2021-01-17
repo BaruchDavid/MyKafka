@@ -1,0 +1,71 @@
+# Kafka-Consumer
+
+Um Stream zu konsumieren, kann den Kafka Consumer verwenden.
+Dieser Consumer wird in der Low-Level API verwendet.
+Für einface Szenarieren wie das Empfangen und Weitersenden der Daten ist diese
+API ausreichend.
+
+z.B kann Daten in den Cluster schicken. Dann konsumieren und entscheiden,
+ob der Datensatz valide ist, dann schickt man es weiter in die nächste Topic
+oder nicht-valide ist, dann schickt man es in eine andere Topic
+
+image::../../pictures/SimpleTopolgy.png[]
+
+## Consumer-Properties
+
+----
+Properties consumerProps = new Properties();
+consumerProps.put(ConsumerConfig.CLIENT_ID_CONFIG, AppConfigs.applicationID);
+consumerProps.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, AppConfigs.bootstrapServers);
+/** StringDeserializer für die Schlüssel */
+consumerProps.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class);
+/** Eigenen Deserializer für Werte benutzen */
+consumerProps.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, JsonDeserializer.class);
+/** bestimmen, welche Klasse, die als Value im Topic ist, deserialisiert wird */
+consumerProps.put(JsonDeserializer.VALUE_CLASS_NAME_CONFIG, PosInvoice.class);
+/** relevant für group-id */
+consumerProps.put(ConsumerConfig.GROUP_ID_CONFIG, AppConfigs.groupID);
+consumerProps.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
+----
+
+## Consumer
+Consumer erzeugen
+----
+KafkaConsumer<String, PosInvoice> consumer = new KafkaConsumer<>(consumerProps);
+----
+Dem Consumer sagen, von welchen Topics erlesen soll. Es können mehrere sein.
+----
+consumer.subscribe(Arrays.asList(AppConfigs.sourceTopicNames));
+----
+
+## Lesen mit dem Consumer
+Das Lesen beabsichtigt eine Real-Time Bearbeitung.
+Consumer muss also ständig laufen, um nicht irgendwann sondern immer und sofort
+die Daten einlesen zu können. Daher muss es in der Endlos-Schleife laufen:
+
+Die Poll-Methode ließt sofort Daten aus der Topic und gibt sie zurück.
+Wenn es keine Daten gibts, dann wartet sie eine Weile "Duration" und gibt
+evtl. einen leeren ConsumerRecord zurück
+----
+while (true) {
+    ConsumerRecords<String, PosInvoice> records = consumer.poll(Duration.ofMillis(100));
+}
+----
+Nach dem man den ConsumerRecord erhalten hat, kann man seine "value", "key" und "offset"-
+Werte auslesen und evtl. sagen, in welche Topic's Daten weiter verschickt werden sollen.
+----
+for (ConsumerRecord<String, PosInvoice> record : records) {
+   if (record.value().getDeliveryType().equals("HOME-DELIVERY") &&
+        record.value().getDeliveryAddress().getContactNumber().equals("")) {
+        //Invalid
+        producer.send(new ProducerRecord<>(AppConfigs.invalidTopicName, record.value().getStoreID(),
+        record.value()));
+        logger.info("invalid record - " + record.value().getInvoiceNumber());
+    } else {
+        //Valid
+        producer.send(new ProducerRecord<>(AppConfigs.validTopicName, record.value().getStoreID(),
+        record.value()));
+        logger.info("valid record - " + record.value().getInvoiceNumber());
+    }
+}
+----

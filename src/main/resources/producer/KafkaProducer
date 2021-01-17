@@ -22,7 +22,7 @@ Daneben gibt es 3 Optional-Arguments: Key, Timestamp, Partition
 ### Sendeablauf:
 Producer schickt Daten an den Broker. Das passiert aber nicht direkt, sondern:
 
-image::ProducerSendActivity.png[]
+image::../pictures/ProducerSendActivity.png[]
 
 
 1. Serializer:
@@ -110,5 +110,5 @@ kriegt I/O Thread nen ACK.
 immer noch nicht klappt oder einen Fehler kriegt,
 kriegt die Send-Methode einen Fehler.
 
-image::ProducerSendActivityFULL.png[]
+image::../pictures/ProducerSendActivityFULL.png[]
 
