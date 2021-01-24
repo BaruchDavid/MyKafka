@@ -1,0 +1,117 @@
+# Implementierung
+
+image::../pictures/StateStoreAblauf.png[]
+1. Erzeuge Streams-App mit Props.
+----
+Properties props = new Properties();
+props.put(StreamsConfig.APPLICATION_ID_CONFIG, "belohnungsApp");
+props.put(StreamsConfig.BOOTSTRAP_SERVERS_CONFIG, "localhost:9191, localhost:9192")
+
+StreamsBuilder streamsBuilder = new StreamsBuilder();
+KStream<String, Rechnung> rechnungStream = streamsBuilder.stream("meineTopic",
+                                                        Consumed.with(AppSerdes.String, AppSerdes.Rechnung));
+
+----
+
+2. Baue Filter ein
+----
+userStream.filter((key,value) -> value.getCustomerType.equals('PRIME')
+----
+
+3. Nun muss man Transform-Values implementieren.
+Dafür braucht man zur nächst den KeyStore
+
+----
+StoreBuilder storeBuilder
+----
+Warum braucht man StoreBuilder und nicht Store, wir brauchen am Ende einen Store
+So ist Kafka designt. Wir bauen StreamsBuilder, StoreBuilder.
+Alles ist in der Topology. Weil die Topology ist eine Ausführungseinheit.
+Jeder Stream-Task erzeug eine Instanz der Topology und führt es unabhängig von anderen aus.
+Also anstatt einen StateStore irgendwoher nehmen zu müssen, nehmen wir tun einen StoreBuilder,
+in die Topology. Da wird ein StreamTask sich selbst eine Kopie des Stores besorgen.
+Wenn wir selbst einen StateStore erzeugen und in die Topology tun, dann kann es Probleme verursachen,
+da dieser Store müsste zwischen Tasks shared und Kafka ist nicht so designed.
+Es ist designt um multiple Aufgaben unabhängig voneinander auszuführen für die Skalierung.
+
+Bauen vom Store, man braucht nen String für KundenId und double für die Summe seiner Belohnungspunkte
+
+----
+StoreBuilder storeBuilder = Stores.keyValueStoreBuilder(Stores.inMemoryKeyValueStore("meinKeyStoreName"),
+                                                        AppSerdes.String(), AppSerdes.Double())
+streamsBuilder.addStateStore( storeBuilder)
+----
+Kafka gibt uns drei Arten von StateStores:
+1. KeyValueStore
+2. SessionStore
+3. WindowStore
+
+All diese drei kann man handhaben in: inMemory oder PersistenConfiguration:
+- InMemoryKeyValueStore
+- InMemorySessionStore
+- InMemoryWindowStore
+- PersistentKeyValueStore
+- PersistentSessionStore
+- PersistenWindowStore
+So hat man am Ende sechs verschiedene Möglichkeiten für einen Store.
+Das steuert man bei dem ersten Parameter:
+Anstatt
+----
+Stores.inMemoryKeyValueStore
+----
+sagt man
+----
+Stores.persistentValueStore
+----
+## PersistentValueStore
+Das erzeugt ein lokales RocksDB Datenbank.
+
+Zurück zum TransformValues:
+----
+kafkaStream.transformValues(()-> new RewardsTransformer(), "meinKeyStoreName")
+----
+transformValues braucht zwei Argumente: etwas, was den TransformValue erbt und
+den KeyStore namen, der oben angelegt wurde.
+transformValues erzeugt uns einen Stream von Daten
+
+ValueTransformer gibt uns ja den Notification-Object zurück, welches
+dann in der Topology weiter ins Topic geschrieben werden soll.
+Das wird beim "to(...)" gemacht
+----
+kafkaUserStream.transformValues(()-> new RewardsTransformer(), "meinKeyStoreName")
+            .to("meinTopic", Produced.with(AppSerdes.String(), AppSerdes.Notification()) //Notification ist das Objekt,
+//welches vom ValueTransformer zurückgegeben wird
+Topology topology = StramsBuilder.build();
+Kafka kafkaStream = new KafkaStream(topology, props)
+kafka.start()
+//kafka normal runterfahren
+----
+
+Die eigene Klasse RewardsTransformer sieht so aus
+----
+class RewardsTransformer extends ValueTransformer<Rechnung, Notification>{
+    private KeyValueStore<String, Double> store
+    override
+   public init(ProcessorStoreContext context){
+        store  = (cast) context.getStateStore("meinKeyStoreName");
+   }
+
+   //wird für jede Nachricht im Stream aufgerufen
+   override
+   public Notifcation transform(Rechnung rechnung){
+        Benachrichtigung nachricht = new Benachrichtigung()
+        //setze irgendwelche Werte, berechne irgendwas
+
+        //hole jetzt aus dem StateStore den vorherigen Wert und addiere
+        //hier passiert die Umsetzung für den StateStore
+        Double aktuelleSumme = store.get(getCustomerId());
+        Dobule neueSumme = aktuelleSumme + berechneBelohnung();
+        store.put(getCustomerId(), neueSumme);
+        nachricht.setBelohungsSaldo(neueSumme);
+        return nachricht;
+   }
+
+   override
+   public close
+}
+----

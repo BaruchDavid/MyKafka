@@ -21,7 +21,7 @@ diesen Broker von seiner Liste
 
 ## 1. Cluster Mitgliedshaft?
 ----
-\Kafka_Streams\kafka_2.12-2.5.0>.\bin\windows\zookeeper-shell.bat localhost:9092
+\Kafka_Streams\kafka_2.12-2.5.0>.\bin\windows\zookeeper-shell.bat localhost:2181
 ls /
 ls /brokers
 ls /ids
@@ -29,7 +29,11 @@ ls /ids
 ## 2. Administrative Tasks im Cluster?
 #### Überwache broker
 #### Weise neuen Überwache zu
-Das macht der Controller. Er ist kein Master im Cluster.
+Das macht der Controller.
+Der Controller überwacht die Liste aktiver Broker im Cluster.
+Wenn ein Broker stirbt, dann weisst dieser Controller die Arbeit einem anderen zu.
+Er ist kein Master im Cluster.
+
 Das ist ein Broker, wie jeder anderer, der ein paar Aufgaben mehr hat.
 Wie finde ich heraus, wer der Controller ist? (Abfrage mit get)
 ----

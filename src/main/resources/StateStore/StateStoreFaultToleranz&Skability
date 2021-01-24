@@ -1,0 +1,28 @@
+# StateStore Anforderungen
+
+## Skalierung
+
+3 Topics werden von einer Anwendung gelesen.
+Diese Anwendung hat ihren lokalen StateStore, wo die jeweiligen Zustände gespeichert sind.
+Nun möchte man skalieren und jede Topic kriegt eigene Instanz.
+Wie migriert man die passenden gespeicherten Zustände von der ersten Instanz auf
+die neuen Instanzen?
+
+
+
+## Ausfallsicherheit
+
+Instanz3 ist runtergefahren, die Zustände sind in der RocksDB persistiert.
+Die Instanz3 kann nicht hochgefahren werden.
+Man nimmt sich den neuen Rechner für die Instanz3. Wie kriegt man die
+Zustände vom kaputten Rechner wieder her?
+
+Skalierung und Ausfallsicherheit wird von Kafka automatisch übernommen.
+Jedes KeyStore kriegt einen Backup in einer speziellen Topic, die Kafka selbst anlegt.
+Bei der Skalierung wird aus dieser Topic hinter den Koulissen gelesen und auf die
+neue Instanzen zugewiesen.
+
+Dieses Feature kann man abschalten, allerdings hat man keine Ausfallsicherheit mehr:
+Auch InMemory DB ist in diesem Kafka Topic abgespeichert. Also kann man Zustände nicht
+verlieren, egal ob InMemory oder LocalStore.
+image::../pictures/FaultToleranceCode.png[]

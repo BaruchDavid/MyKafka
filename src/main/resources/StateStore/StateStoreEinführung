@@ -1,0 +1,55 @@
+# StateStore
+
+Man verarbeitet Daten von einem Event zum anderen.
+Z.b hat man Requirment 1 in seiner Verarbeitungskette:
+filter() -> mapValues()
+Im Requirment 2 hat man eine andere Verarbeitungskette:
+mapValues() -> flatMapValues()
+
+Die Schritte mapValues und flatMapValues gehören zur verschiedenen Verarbeitungsketten
+und haben keinen Bezug zureinander. Das ist ein typischer Fall.
+Oft muss man sich an bestimmte Information erinnern können
+oder irgendeinen Kontext vergangener Events.
+
+State und StateStores werden verwendet um Informationen aus der Vergangenheit
+zubekommen.
+
+# Ablauf beim Problem:
+
+image::../pictures/StateStoreAusgangsLage.png[]
+
+Der Kunde bezahlt eine Rechnung und kriegt seine 50 Belohungspunkte.
+Aber was ist mit anderen Belohnungspunkten aus der Vergangenheit?
+Der Kunde will seine Gesamtanzahl an Belohnungspunkten sehen.
+Wir können das nicht berechnen, ohne uns über die vorherigen Belohnungspunkte zu erinnern.
+
+## Lösung
+
+image::../pictures/StateStoreLoesung.png[]
+
+Die Tabelle enthält den aktuellen Zustand der Belohungspunkte des Kunden.
+Diese Tabelle nennt man Zustand. Die meistenen Programme haben einen Zustand.
+Das ist ein fundamentaler Bestandteil der Anwendung.
+Es kann ein Key-Value-Store sein, eine Tabelle oder mehrere Tabellen.
+
+## Orte, wo man den Zustand hält
+Zwei Kriterien müssen erfüllt sein: Es ist schnell und fehlertolerant
+
+1. In-Memory
+2. Locale Festplatte
+3. externe Datenbank
+Mysql oder Postgres oder Cassandra: Problem mit der Geschwindigkeit, es gibt einen
+Delay über das Netzwerk. Es könnte auch schneller funktionieren.
+
+Deswegen bietet Kafka zwei Alternativen:
+1. Fehler-Tolerante In-Memory State-Store
+2. Recoverable persistent State-Store
+
+Es gibt also State-Full Prozesse und State-Less Prozesse.
+Prozesse wie: Aggregationen, Joining, Windowing sind Statefull Prozesse  und sie
+brauchen Zugang zum StateStore
+
+
+
+
+

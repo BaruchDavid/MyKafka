@@ -1,0 +1,77 @@
+# StateStore Problem
+
+Jeder Kafka-Streams Anwendung läuft auf seiner Instanz.
+Nun dabei seinen eigenen lokalen RocksDB Speicherplatz.
+
+Wenn der erste Zustand des KundenA auf der Instanz1 gespeichert wird
+Und der zweite Zustand des KundenA auf der Instanz2 da diese Anfrage gerade von der zweiten Instanz
+verarbeitet wurde, kann man nicht den Gesamtzustand von Instanz1 und Instanz2 berechnen.
+
+image::../pictures/StateStoreProblem.png[]
+
+# Lösung 1:
+
+Stelle sicher, dass alle Daten vom Zustand des KundenA auf die richtige Partition kommen.
+Man kommt auf die Idee, den Schlüssel für die richtige Partition
+auf die KundenId zu setzen anstatt auf die StoreId.
+So würden zwar alle Daten des KundenA auf die (durch den Hash) gleiche Partition kommen,
+aber durch die Menge der neuen Kunden, müsste man ständig pro Kunde eine Partition erstellen.
+Dann würden sich die Anzahl der Partitionen ändern und somit der Hash.
+Der KundeA war gestern noch auf der ersten Partition, und morgen ist er schon auf der 10ten
+Partition auf der Hash des Schlüssels sich geändert hat. Ständiges Repartitions führt
+zur Performance-Problemen.
+
+# Lösung 2: Custom Partitioner
+
+Wir wollen immernoch die CostomerId für die Zuordnung nutzen und nicht die MessageId.
+Repartitionierung ist ein normale Anforderung beim Stream-Anwendungen. Das setzt man mit
+'through()' um.
+1. Through() schreibt den aktuellen Stream in eine tmp-topic
+2. Dann verwendet er deinen eigen-geschrieben custom-Repartitionier
+3. Dann liest Through() die tmp-topic und gibt einen neuen Stream zurück
+   Man muss nicht also selbst noch mal schreiben/lesen
+   Also wir nehmen einen KStream ins Through() mit MessageID als Key
+   und geben einen neuen KStream aus dem Through() mit CustomerID als Key
+
+----
+    public class BelohnungsPartitioner implements StreamPartitioner<String, Rechnung> {
+
+        @Override
+        public Integer partition(String topic, String key, Rechnung value, int numPartitions){
+            //Grundlage für den neuen Key ist Customerid
+            value.getCutomerId().hashCode() % numPartitions;
+        }
+
+    }
+----
+Anwendung vom Custom-Partitioner
+----
+    StoreBuilder keyValueStoreBuilder = Stores.keyValueStoreBuilder(
+        Stores.inMemoryKeyValueStore("belohnungsStore"),
+        AppSerdes.String(), AppSerdes.Double()
+    );
+    KStream<String, Rechnung> origStream = streamBuilder.stream("StoreTopic"
+                Consumed.with(AppSerdes.String(), AppSerdes.PosInvoice())
+                .filter((key, value) -> value.getCustomerType().equals("prime");
+
+    origStream.addStore(keyValueStoreBuilder);
+
+    origStream.through("tmpTopic",
+                        Produced.with(AppSerdes.String(),
+                                        AppSerdes.Rechnung(),
+                                        new BelohnungsPartitioner()))
+                //jetzt im richtigen KeyValueStore aggregieren
+                .transformValues(() -> new BelohnungTransformer(), "belohnungsStore")
+                //schreibe in eine weiterführende Topic
+                .to("belohnungsTopic", AppSerdes.String(), AppSerdes.Belohung());
+
+    KafkaStreams kafkaStreams = new KafkaStreams(builder.build(), props);
+    kafkaStreams.start();
+    Runtime.getRuntime.addShutdownHook(new Thread(()->{ System.out.println("stop stream");
+                                                        stream.cleanUp();
+                                                    }));
+
+----
+
+
+

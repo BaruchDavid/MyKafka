@@ -1,0 +1,67 @@
+# Kafka-Strams
+
+jede Kafka-Streams Anwendung muss mit einer ID versehen werden.
+Wenn man mehrere Instanzen von dieser Kafka-Streams Anwendung laufen,
+dann müssen sie alle die gleiche ID haben, damit Kafka weisst, dass sie
+alle zur gleichen Anwendung gehören.
+
+## ID
+----
+props.put(StreamsConfig.APPLICATION_ID_CONFIG, 'StreamsApp1');
+----
+
+## Boostrap Liste
+Dann übergibt man eine Liste der Broker in einem Cluster, zur dem
+sich die Anwendung verbindet.
+
+----
+props.put(StreamsConfig.BOOTSTRAP_SERVERS_CONFIG, "localhost:9091, localhost:9092, localhost:9093");
+----
+
+## Serdes
+Dann bestimmt man die De/Serialisierung
+Vorher haben wir für den Producer den Serializer verwendet.
+Für den Consumer haben wir den Deserializer verwendet.
+
+Kafka-Streams Anwendung ließt und schreibt Daten, daher braucht man
+hier auch direkt Serializer und Deserializer.
+
+----
+props.put(StreamsConfig.DEFAULT_KEY_SERDE_CLASS_CONFIG, Serdes.Integer().getClass());
+props.put(StreamsConfig.DEFAULT_VALUE_SERDE_CLASS_CONFIG, Serdes.String().getClass());
+----
+Serdes-Klasse ist eine Factory-Klasse, die den Serializer und Deserializer kombiniert.
+
+# Hauptteil der Kafka-Streams
+
+## Öffnet Stream zum Source-Topic
+----
+KStream<Integer, String> kstream = streamsBuilder.stream('topic-name');
+----
+
+## Verarbeite Stream
+----
+kstream.foreach((key, value ) -> System.out.println(key, value))
+----
+## Erzeuge Topology
+Alles, was man im zweiten Schritt verarbeitet, kann man in die Topology bringen.
+
+----
+Topology topology = streamsBuilder.build();
+----
+
+## Starte den Stream
+----
+KafkaStreams streams = new KafkaStreams(topology, props);
+streams.start();
+----
+
+## Runterfahren vom Stream
+Wenn man runterfährt, muss man alles sauber abschließen
+
+----
+Runtime.getRuntime().addShutdownHook(new Thread(()-> {Streams.close();}))
+----
+
+
+
