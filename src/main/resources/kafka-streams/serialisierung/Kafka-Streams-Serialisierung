@@ -1,0 +1,28 @@
+Kafka-Streams bietet für Se- und Desirialisierung
+schon Klassen für: String, Integer, Long, UUID etc.
+
+Wenn man eigene Klassen über die Topic ließt und schreibt, dann braucht
+man seinen eigenen Se-Desirializer.
+Den nennt man dann seinen AppSerde.
+
+# JSON
+
+Objekte werden als Json-Strings vom Producer an Consumer übertragen.
+Zwei Probleme gibts dabei:
+
+*1* Strings belasten das Netzwerk zusätzlich.
+
+*2* Das Schema des übertragenen Json-Objektes kann sich ändern,
+sodass der Producer einige Felder nicht mehr mitschickt oder sie ändert,
+wovon der Consumer nichts weiss. Das verursacht Probleme beim Lesen.
+
+# AVRO
+
+Avro ist bei den BigData Projekten im Einsatz.
+Wie aus dem Json-Schema kann man auch aus dem Avro-Schema einen Pojo erzeugen.
+Limitierung bei Avro ist, dass man keine Extends oder Implement-Konstrukte verwenden.
+Man kann statt Vererbung die Komposition verwenden.
+Avro löst mit von Confluent angebotenen Schema-Registry das Problem mit der
+Änderung von Schematas.
+
+image::../../pictures/SchemaRegistry.png[]

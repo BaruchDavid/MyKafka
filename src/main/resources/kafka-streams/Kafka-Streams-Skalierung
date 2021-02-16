@@ -1,0 +1,58 @@
+Kafka-Streams wendet ursprüngliche Funktionen von Apache-Kafka an
+um Parallelität und Ausfallsicherheit zu gewährleisten.
+
+# Single-Thread
+Normaleweise läuft eine Kafka-Strams mit einem Topic aus drei Partitionen
+auf einer Machine mit einer Topology. Und das läuft einem Single-Thread.
+Es wurden bis jetzt keine Kafka-Streams anwendungen mit mehreren Threads gestartet.
+
+# Vertikales Skalieren: Multi-Thread
+
+----
+props.put(StreamsConfig.NUM_STREAM_THREADS_CONFIG, 3)
+----
+Jetzt läuft eine Instanz der Anwendung mit drei threads.
+Jeder Thread führt einen oder mehrere Tasks.
+Die Paralität ist dann 10, da wir 10 Thread haben.
+
+# Horizontales Skalieren: mehrere Computer
+
+Hierbei Startet man kafka-streams Anwendung auf dem PC1 und PC2.
+Dabei kann man auf dem PC1 vertikal skalieren auf 3 Threads
+und auf PC2 vertikal skalieren auf 5 Threads
+
+image::../pictures/Vertikal_Horizontal-Skaling.png[]
+
+# Was ist ein Task:
+
+Kafka-Streams baut anhand der Partitions-Anzahl logische Tasks.
+Jeder Task kriegt eine Kopie der Topology.
+Wenn man auf mehrere Topics hört, dann nimmt sich Kafka-Streams eine Topic
+mit der größten Anzahl von Partitionen und macht entspreched so viele Tasks.
+
+image::../pictures/ScalingKafkaProducerPic2.png[]
+
+Anwendung mit 2 Topics und jeweils 3 Partitionen wird gestartet
+auf einer Maschine mit 2 Threads.
+Wir haben 3 Threads (Topic mit der größten Anzahl an Partitionen)
+und wir haben 2 Threads gestartet:
+Verteilung: 1te Machine und Thread Nr1 hat einen Task
+            2te Machine und Thread Nr2 hat zwei Task zu verarbeiten
+Die Verteilung der Tasks ist nicht gerade.
+
+Jetzt wollen wir horizontal skalieren:
+Zweite Machine mit einem Task kommt dazu.
+Nun schiebt Kafka-Streams automatisch den 3ten Thread auf die neue Machine
+mit neuem Thread. => Rebalancing.
+Bei noch mehr Machinen oder Threads kann man starten, aber die bleiben IDLE,
+also sie tun nichts, weil wir keine Tasks mehr haben. Alle Tasks sind schon gerade
+verteilt worden. Ein Task pro ein Thread auf einer Machine.
+
+# Ausfallsicherheit:
+
+Wenn nun die neue Maschine plötzlich ausfällt, dann schiebt
+Kafka-Streams den dritten Task zurück auf die erste Maschine in den zweiten Thread rein.
+
+image::../pictures/KafkaStreamsFaultTolerance.png[]
+
+
